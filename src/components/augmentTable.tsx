@@ -34,8 +34,8 @@ const avgPlacementCell = (props: CellContext<AugmentStats, number | null>) => {
 
   if (avgPlacement === null) return <span>-</span>;
 
-  // mix percentage of green to red, max green value is at avgPlacement of 3, max reg value at avgPlacement of 5
-  const mixPercentage = Math.max(0, Math.min(2, avgPlacement - 3)) * 50;
+  // mix percentage of green to red, max green value is at avgPlacement of 4, max reg value at avgPlacement of 5
+  const mixPercentage = Math.max(0, Math.min(1, avgPlacement - 4)) * 100;
 
   return (
     <span
