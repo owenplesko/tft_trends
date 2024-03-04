@@ -6,11 +6,58 @@ import {
   getSortedRowModel,
   useReactTable,
   createColumnHelper,
+  HeaderContext,
 } from "@tanstack/react-table";
 import Image from "next/image";
+import Selection from "~/components/selection";
 import { useState } from "react";
-import { type AugmentStats } from "~/types/augmentStats";
+import { AugmentStatsSchema, type AugmentStats } from "~/types/augmentStats";
 import augmentData, { type AugmentId } from "~/types/augmentData";
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+
+const augmentHeader = () => {
+  return (
+    <div className="flex select-none">
+      <span>Augment</span>
+    </div>
+  );
+};
+
+const sortableHeaderFactory = (label: string) => {
+  const headerFunc = (ctx: HeaderContext<AugmentStats, number | null>) => {
+    return (
+      <div className="flex cursor-pointer select-none justify-center">
+        <span>{label}</span>
+        {ctx.column.getIsSorted() === false ? (
+          <Image
+            alt="sort none icon"
+            width={24}
+            height={24}
+            src={"sort/sort_none.svg"}
+          />
+        ) : null}
+        {ctx.column.getIsSorted() === "asc" ? (
+          <Image
+            alt="sort asc icon"
+            width={24}
+            height={24}
+            src={"sort/sort_asc.svg"}
+          />
+        ) : null}
+        {ctx.column.getIsSorted() === "desc" ? (
+          <Image
+            alt="sort desc icon"
+            width={24}
+            height={24}
+            src={"sort/sort_desc.svg"}
+          />
+        ) : null}
+      </div>
+    );
+  };
+  return headerFunc;
+};
 
 const augmentCell = (props: CellContext<AugmentStats, AugmentId>) => {
   const augmentId = props.getValue();
@@ -56,43 +103,75 @@ const columnHelper = createColumnHelper<AugmentStats>();
 const columns = [
   columnHelper.accessor("augment_id", {
     cell: augmentCell,
-    header: "Augment",
+    header: augmentHeader,
     enableSorting: false,
   }),
   columnHelper.accessor("avg_placement", {
     cell: avgPlacementCell,
     sortDescFirst: false,
-    header: "Avg Place",
+    header: sortableHeaderFactory("Avg Place"),
   }),
   columnHelper.accessor("pick_1_avg_placement", {
-    header: "1st Pick",
+    header: sortableHeaderFactory("1st Pick"),
     sortDescFirst: false,
     cell: avgPlacementCell,
   }),
   columnHelper.accessor("pick_2_avg_placement", {
-    header: "2nd Pick",
+    header: sortableHeaderFactory("2nd Pick"),
     sortDescFirst: false,
     cell: avgPlacementCell,
   }),
   columnHelper.accessor("pick_3_avg_placement", {
-    header: "3rd Pick",
+    header: sortableHeaderFactory("3rd Pick"),
     sortDescFirst: false,
     cell: avgPlacementCell,
   }),
   columnHelper.accessor("frequency", {
-    header: "Frequency",
+    header: sortableHeaderFactory("Frequency"),
     sortDescFirst: true,
   }),
 ];
 
-const AugmentTable = ({ data }: { data: AugmentStats[] }) => {
+const AugmentTable = () => {
+  // state
+  const [gameVersion, setGameVersion] = useState<string>();
+
   const [sorting, setSorting] = useState<SortingState>([
     { id: "avg_placement", desc: false },
   ]);
 
+  // queries
+  const getGameVersions = async () => {
+    const res = await fetch("/api/augments/stats/gameVersions");
+    const data = await res.json();
+    const gameVersions = z.string().array().parse(data);
+    setGameVersion(gameVersions.at(0));
+    return gameVersions;
+  };
+
+  const gameVersionsQuery = useQuery({
+    queryKey: ["gameVersions"],
+    queryFn: getGameVersions,
+  });
+
+  const getAugmentStats = async () => {
+    const res = await fetch(`/api/augments/stats?gameVersion=${gameVersion}`);
+    const data = await res.json();
+    const augmentStats = AugmentStatsSchema.array().parse(data);
+    return augmentStats;
+  };
+
+  const augmentStatsQuery = useQuery({
+    queryKey: ["augmentStats", gameVersion],
+    queryFn: getAugmentStats,
+    staleTime: Infinity,
+    enabled: !!gameVersion,
+  });
+
+  // table decleration
   const table = useReactTable({
     columns,
-    data,
+    data: augmentStatsQuery.data || [],
     state: {
       sorting,
     },
@@ -101,73 +180,70 @@ const AugmentTable = ({ data }: { data: AugmentStats[] }) => {
     getSortedRowModel: getSortedRowModel(),
   });
 
+  // loading state component
+  if (!augmentStatsQuery.data) {
+    return;
+  }
+
+  // main component
   return (
-    <table className="bg-neutral-800 text-neutral-300">
-      <thead>
-        {table.getHeaderGroups().map((headerGroup) => (
-          <tr key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <th
-                className="p-4"
-                key={header.id}
-                colSpan={header.getSize()}
-                onClick={header.column.getToggleSortingHandler()}
-              >
-                <div
-                  className={`${header.column.getCanSort() ? "cursor-pointer" : null} ${header.column.id === "augment_id" ? null : "justify-center"} flex select-none`}
-                >
-                  <span>{header.column.columnDef.header?.toString()}</span>
-                  {header.column.getCanSort() &&
-                  header.column.getIsSorted() === false ? (
-                    <Image
-                      alt="sort none icon"
-                      width={24}
-                      height={24}
-                      src={"sort/sort_none.svg"}
-                    />
-                  ) : null}
-                  {header.column.getIsSorted() === "asc" ? (
-                    <Image
-                      alt="sort asc icon"
-                      width={24}
-                      height={24}
-                      src={"sort/sort_asc.svg"}
-                    />
-                  ) : null}
-                  {header.column.getIsSorted() === "desc" ? (
-                    <Image
-                      alt="sort desc icon"
-                      width={24}
-                      height={24}
-                      src={"sort/sort_desc.svg"}
-                    />
-                  ) : null}
-                </div>
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody>
-        {table.getRowModel().rows.map((row) => {
-          return (
-            <tr key={row.id}>
-              {row.getVisibleCells().map((cell) => {
-                return (
-                  <td
-                    className="border-y border-neutral-700 px-4 py-2 text-center"
-                    key={cell.id}
-                    colSpan={cell.column.getSize()}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-row">
+        {gameVersionsQuery.data && gameVersion && (
+          <Selection
+            label="Patch"
+            options={gameVersionsQuery.data}
+            selection={gameVersion}
+            setSelection={setGameVersion}
+          />
+        )}
+      </div>
+      <div className="flex flex-col rounded-md border border-neutral-950 bg-neutral-800 text-neutral-300">
+        <table className="divide-y divide-neutral-700">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    className="p-4"
+                    key={header.id}
+                    colSpan={header.getSize()}
+                    onClick={header.column.getToggleSortingHandler()}
                   >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                );
-              })}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody className="divide-y divide-neutral-700">
+            {table.getRowModel().rows.map((row) => {
+              return (
+                <tr key={row.id}>
+                  {row.getVisibleCells().map((cell) => {
+                    return (
+                      <td
+                        className="px-4 py-2 text-center"
+                        key={cell.id}
+                        colSpan={cell.column.getSize()}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 };
 
