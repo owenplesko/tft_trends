@@ -6,7 +6,7 @@ import {
   getSortedRowModel,
   useReactTable,
   createColumnHelper,
-  HeaderContext,
+  type HeaderContext,
 } from "@tanstack/react-table";
 import Image from "next/image";
 import Selection from "~/components/selection";
@@ -143,7 +143,7 @@ const AugmentTable = () => {
   // queries
   const getGameVersions = async () => {
     const res = await fetch("/api/augments/stats/gameVersions");
-    const data = await res.json();
+    const data: unknown = await res.json();
     const gameVersions = z.string().array().parse(data);
     setGameVersion(gameVersions.at(0));
     return gameVersions;
@@ -156,9 +156,13 @@ const AugmentTable = () => {
 
   const getAugmentStats = async () => {
     const res = await fetch(`/api/augments/stats?gameVersion=${gameVersion}`);
-    const data = await res.json();
+    const data: unknown = await res.json();
     const augmentStats = AugmentStatsSchema.array().parse(data);
-    return augmentStats;
+
+    let totalAugments = 0;
+    for (const stat of augmentStats) totalAugments += stat.frequency;
+
+    return { augmentStats, totalAugments };
   };
 
   const augmentStatsQuery = useQuery({
@@ -171,7 +175,7 @@ const AugmentTable = () => {
   // table decleration
   const table = useReactTable({
     columns,
-    data: augmentStatsQuery.data || [],
+    data: augmentStatsQuery.data?.augmentStats ?? [],
     state: {
       sorting,
     },
@@ -188,7 +192,7 @@ const AugmentTable = () => {
   // main component
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-row">
+      <div className="flex flex-row justify-between">
         {gameVersionsQuery.data && gameVersion && (
           <Selection
             label="Patch"
@@ -197,6 +201,9 @@ const AugmentTable = () => {
             setSelection={setGameVersion}
           />
         )}
+        <span className="rounded-md border border-neutral-950 bg-neutral-800 px-4 py-1 text-neutral-300">
+          {`Analyzed: ${augmentStatsQuery.data.totalAugments.toLocaleString()}`}
+        </span>
       </div>
       <div className="flex flex-col rounded-md border border-neutral-950 bg-neutral-800 text-neutral-300">
         <table className="divide-y divide-neutral-700">
