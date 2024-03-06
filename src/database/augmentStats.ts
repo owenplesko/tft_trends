@@ -59,10 +59,12 @@ export const getAugmentStatsLatestGameVersion = async () => {
   return augmentStats;
 };
 
-export const getAugmentStatsByGameVersion = async ({
+export const getAugmentStats = async ({
   gameVersion,
+  minTier,
 }: {
   gameVersion: string;
+  minTier: string;
 }) => {
   const query = `
     SELECT
@@ -88,11 +90,11 @@ export const getAugmentStatsByGameVersion = async ({
       END AS pick_3_avg_placement,
       SUM(pick_3_frequency) AS pick_3_frequency
     FROM tft_augment_stats
-    WHERE game_version = $1
+    WHERE game_version = $1 AND match_tier >= $2
     GROUP BY augment_id
   `;
 
-  const res = await pool.query(query, [gameVersion]);
+  const res = await pool.query(query, [gameVersion, minTier]);
 
   const augmentStats = AugmentStatsSchema.array().parse(res.rows);
 

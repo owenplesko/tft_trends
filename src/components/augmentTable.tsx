@@ -135,6 +135,7 @@ const columns = [
 const AugmentTable = () => {
   // state
   const [gameVersion, setGameVersion] = useState<string>();
+  const [minTier, setMinTier] = useState<string>("DIAMOND");
 
   const [sorting, setSorting] = useState<SortingState>([
     { id: "avg_placement", desc: false },
@@ -155,7 +156,9 @@ const AugmentTable = () => {
   });
 
   const getAugmentStats = async () => {
-    const res = await fetch(`/api/augments/stats?gameVersion=${gameVersion}`);
+    const res = await fetch(
+      `/api/augments/stats?gameVersion=${gameVersion}&minTier=${minTier}`,
+    );
     const data: unknown = await res.json();
     const augmentStats = AugmentStatsSchema.array().parse(data);
 
@@ -166,7 +169,7 @@ const AugmentTable = () => {
   };
 
   const augmentStatsQuery = useQuery({
-    queryKey: ["augmentStats", gameVersion],
+    queryKey: ["augmentStats", gameVersion, minTier],
     queryFn: getAugmentStats,
     staleTime: Infinity,
     enabled: !!gameVersion,
@@ -192,16 +195,36 @@ const AugmentTable = () => {
   // main component
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-row justify-between">
+      <div className="flex flex-row justify-start gap-2">
         {gameVersionsQuery.data && gameVersion && (
           <Selection
-            label="Patch"
-            options={gameVersionsQuery.data}
+            label="Patch:"
+            options={gameVersionsQuery.data.map((str) => ({
+              display: str,
+              value: str,
+            }))}
             selection={gameVersion}
             setSelection={setGameVersion}
           />
         )}
-        <span className="rounded-md border border-neutral-950 bg-neutral-800 px-4 py-1 text-neutral-300">
+        <Selection
+          label="Tier:"
+          options={[
+            { display: "Challenger+", value: "CHALLENGER" },
+            { display: "GrandMaster+", value: "GRANDMASTER" },
+            { display: "Master+", value: "MASTER" },
+            { display: "Diamond+", value: "DIAMOND" },
+            { display: "Emerald+", value: "EMERALD" },
+            { display: "Platinum+", value: "PLATINUM" },
+            { display: "Gold+", value: "GOLD" },
+            { display: "Silver+", value: "SILVER" },
+            { display: "Bronze+", value: "BRONZE" },
+            { display: "Iron+", value: "IRON" },
+          ]}
+          selection={minTier}
+          setSelection={setMinTier}
+        />
+        <span className="ml-auto rounded-md border border-neutral-950 bg-neutral-800 px-4 py-1 text-neutral-300">
           {`Analyzed: ${augmentStatsQuery.data.totalAugments.toLocaleString()}`}
         </span>
       </div>
